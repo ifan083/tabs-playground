@@ -1,10 +1,12 @@
 package com.example.tabs.inpayment.domain
 
-import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.example.tabs.domain.Requirement
 import com.example.tabs.domain.TextData
+import com.example.tabs.domain.formatting.ThousandsDelimiter
+import com.example.tabs.domain.validation.InRange
 import com.example.tabs.inpayment.data.Accounts
 import com.example.tabs.inpayment.data.CreditAccount
 import com.example.tabs.inpayment.data.DebitAccount
@@ -26,7 +28,7 @@ class SingleOrdersUseCase(accounts: Accounts) : Order {
   
   val get = mutableStateOf(SingleViewState(
     amount = AmountData(
-      amount = TextFieldValue(
+      textFieldValue = TextFieldValue(
         text = initialAmountValue,
         selection = TextRange(initialAmountValue.length)
       ),
@@ -37,6 +39,11 @@ class SingleOrdersUseCase(accounts: Accounts) : Order {
     debitAccountList = accounts.debitAccounts.map { toTextData(it) },
     creditAccountList = accounts.creditAccounts.map { toTextData(it) }
   ))
+  
+  private val amountInputRequirement = Requirement(
+    formatting = ThousandsDelimiter(),
+    validity = listOf(InRange(1000, 5000))
+  )
   
   fun onSelectedDebitAccount(textData: TextData) {
     if (get.value.selectedDebitAccount != textData) {
@@ -51,51 +58,39 @@ class SingleOrdersUseCase(accounts: Accounts) : Order {
   }
   
   fun onAmountChanged(newAmount: TextFieldValue) {
-    if (get.value.amount.amount != newAmount) {
-      //strip formatting
-      
-      if (newAmount.text.isBlank()) {
-        get.value = get.value
-          .copy(amount = AmountData(newAmount, hintText))
-        return
-      }
-      
-      val amountVal = newAmount.text.replace("'", "").toLong()
-      val oldSelection = get.value.amount.amount.selection
-      val oldLength = newAmount.text.length
-      val isOldCursorLast =
-        oldSelection.start == (oldLength + 1) && oldSelection.end == (oldLength + 1)
-      Log.e("Cursor", "isLast=$isOldCursorLast")
-      
-      //validate
-      val error = if (amountVal > 5000) "Amount over 5'000, please fix" else null
-      
-      //apply formatting
-      val formattedVal = thousands(amountVal)
-      
+    val isCursorChange = get.value.amount.textFieldValue.text == newAmount.text
+    if (isCursorChange) {
       get.value = get.value.copy(
-        amount = AmountData(
-          amount = newAmount.copy(
-            text = formattedVal
-//            selection = if (isOldCursorLast) TextRange(formattedVal.length) else oldSelection
-          ),
-          error = error,
-          hint = hintText
-        )
+        amount = get.value.amount.copy(textFieldValue = newAmount)
       )
-      
+      return
     }
-  }
-  
-  private fun thousands(input: Long): String {
-    val inputAsString = input.toString()
-    val from = inputAsString.length % 3
-    val temp = inputAsString.mapIndexed { index, char ->
-      if ((index + 1) % 3 == from) "$char'"
-      else "$char"
-    }.joinToString(separator = "") { it }
-    return if (temp.endsWith("'")) temp.substring(0, temp.length - 1)
-    else temp
+    
+    if (newAmount.text.isBlank()) {
+      //empty string
+      get.value = get.value
+        .copy(amount = get.value.amount.copy(textFieldValue = newAmount))
+      return
+    }
+    
+    val result = amountInputRequirement.check(newAmount.text)
+    
+    val oldSelection = get.value.amount.textFieldValue.selection
+    val oldSelectionAtEnd = oldSelection.start == oldSelection.end
+        && oldSelection.start == get.value.amount.textFieldValue.text.length
+    
+    val newSelection = if (oldSelectionAtEnd) TextRange(result.value.length)
+    else newAmount.selection
+    
+    get.value = get.value.copy(
+      amount = get.value.amount.copy(
+        textFieldValue = newAmount.copy(
+          text = result.value,
+          selection = newSelection
+        ),
+        error = if (result.error != null) "Amount over 5'000, try below" else null
+      )
+    )
   }
   
   //data execution

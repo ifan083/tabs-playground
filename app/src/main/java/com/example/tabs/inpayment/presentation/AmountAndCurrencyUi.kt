@@ -9,11 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusEventModifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -25,7 +23,7 @@ import com.example.tabs.presentation.DefaultChooserTextItemHolder
 import com.example.tabs.presentation.Sheet
 
 data class AmountData(
-  val amount: TextFieldValue,
+  val textFieldValue: TextFieldValue,
   val hint: String? = null,
   val error: String? = null
 )
@@ -83,7 +81,7 @@ fun AmountAndCurrency(
           .onFocusEvent {
             Log.e("FocusEvent", it.toString())
           },
-        value = amount.amount,
+        value = amount.textFieldValue,
         onValueChange = { tfv: TextFieldValue ->
           Log.e("Selection", tfv.selection.toString())
           
